@@ -6,7 +6,6 @@ import com.vladsch.flexmark.ext.emoji.EmojiExtension;
 import com.vladsch.flexmark.ext.emoji.EmojiImageType;
 import com.vladsch.flexmark.ext.emoji.EmojiShortcutType;
 import com.vladsch.flexmark.ext.escaped.character.EscapedCharacterExtension;
-import com.vladsch.flexmark.ext.footnotes.FootnoteExtension;
 import com.vladsch.flexmark.ext.gfm.strikethrough.StrikethroughExtension;
 import com.vladsch.flexmark.ext.gfm.tasklist.TaskListExtension;
 import com.vladsch.flexmark.ext.gitlab.GitLabExtension;
@@ -30,6 +29,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import run.halo.app.model.support.HaloConst;
+import run.halo.app.utils.footnotes.FootnoteExtension;
 
 /**
  * Markdown utils.
@@ -71,7 +71,8 @@ public class MarkdownUtils {
     private static final Parser PARSER = Parser.builder(OPTIONS).build();
 
     private static final HtmlRenderer RENDERER = HtmlRenderer.builder(OPTIONS).build();
-    private static final Pattern FRONT_MATTER = Pattern.compile("^---[\\s\\S]*?---");
+    private static final Pattern FRONT_MATTER = Pattern.compile("^(---)?[\\s\\S]*?---");
+    private static final Pattern TABLE = Pattern.compile("\\|\\s*:?---");
 
     //    /**
     //     * Render html document to markdown document.
@@ -111,8 +112,6 @@ public class MarkdownUtils {
             markdown = markdown
                 .replaceAll(HaloConst.YOUTUBE_VIDEO_REG_PATTERN, HaloConst.YOUTUBE_VIDEO_IFRAME);
         }
-        // footnote render method delegation.
-        FootnoteNodeRendererInterceptor.doDelegationMethod();
 
         Node document = PARSER.parse(markdown);
 
@@ -138,6 +137,9 @@ public class MarkdownUtils {
                 return row;
             }
         }).collect(Collectors.joining("\n"));
+        if (!markdown.startsWith("---\n")) {
+            markdown = "---\n" + markdown;
+        }
         AbstractYamlFrontMatterVisitor visitor = new AbstractYamlFrontMatterVisitor();
         Node document = PARSER.parse(markdown);
         visitor.visit(document);
@@ -153,7 +155,8 @@ public class MarkdownUtils {
     public static String removeFrontMatter(String markdown) {
         markdown = markdown.trim();
         Matcher matcher = FRONT_MATTER.matcher(markdown);
-        if (matcher.find()) {
+        // if has '| ---' or '| :---' return
+        if (matcher.find() && !TABLE.matcher(matcher.group()).find()) {
             return markdown.replace(matcher.group(), "");
         }
         return markdown;
